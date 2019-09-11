@@ -18,19 +18,23 @@ public enum DriveType
 public class CarControlCS : MonoBehaviour {
 
 	
-	
+	//no se ocupan
 	public GUITexture gasPedal;
 	public GUITexture brakePedal;
 	public GUITexture leftPedal;
 	public GUITexture rightPedal;
+	//no se ocupan
 
 	//mis variables
 	Rigidbody rb;
 	int rotation;
 	float velocidad;
-	bool sensorChoque;
 	Collider[] collidersObstaculos;
-
+	bool sensorChoqueObjeto;
+	Rigidbody piedraRecogida;
+	Vector3 puntoInicial;
+	bool sensorBaseEspacial;
+	Rigidbody baseEspacial;
 	// Use this for initialization
 	void Start () {
 		//Alter the center of mass for stability on your car
@@ -43,8 +47,9 @@ public class CarControlCS : MonoBehaviour {
 		rb = GetComponent<Rigidbody>();
 		rotation =0 ;
 		velocidad = 5.0f;
-		sensorChoque = false;
-		collidersObstaculos = new Collider[10];
+		sensorChoqueObjeto = false;
+		piedraRecogida = null;
+		setPuntoInicial();
 	}
 	
 	// Update is called once per frame
@@ -63,35 +68,93 @@ public class CarControlCS : MonoBehaviour {
 			avanzarConRotacion(rotation);
         }
 
-        if(sensorChoque){
+        if(sensorChoqueObjeto){
         	pararAuto();
         	rotarAuto(90);
         }
 
-        sensorChoque = false;
+        if(piedraRecogida != null){
+        	moverPiedraRecogida();
+        }
 
+        if(sensorBaseEspacial){
+        	Debug.Log("En base prros");
+        }
+
+        desactivarSensores(); //siempre se debe poner al final de la funcion
+        
 	}
 
-	//solo se activa si choca directamente 
-	void OnCollisionEnter (Collision col)
-    {
-        //no Debería llegar aquí por que ya chocaste
-    }
+	void desactivarSensores(){
+		sensorChoqueObjeto = false;
+        sensorBaseEspacial = false;
+	}
 
-    //Destroy everything that enters the trigger
-	void OnTriggerEnter (Collider col) {
-		if(col.gameObject.tag == "Obstaculo")
+	void setPuntoInicial(){
+		puntoInicial = rb.position;
+	}
+
+	float calcularDistanciaRecorrida(){
+		float dist = Vector3.Distance(puntoInicial, rb.position);
+		return dist;
+	}
+
+	bool isModoReversa(){
+		if(velocidad >0){
+			return false;
+		}
+		return true;
+	}
+
+	bool isModoAdelante(){
+		if(velocidad >0){
+			return true;
+		}
+		return false;
+	}
+
+	void setModoReversa(){
+		if(velocidad >0){
+			velocidad = velocidad * (-1);
+		}
+	}
+
+	void setModoAdelante(){
+		if(velocidad <0){
+			velocidad = -velocidad * (-1);
+		}
+	}
+
+	void soltarPiedraRecogida(){
+		piedraRecogida = null;
+	}
+
+	void moverPiedraRecogida(){
+		piedraRecogida.MovePosition(rb.position + new Vector3(0,10,0));
+	}
+
+	void OnCollisionStay(Collision col)
+    {
+        if(col.gameObject.tag == "Obstaculo")
         {
-            anadirColliderObstaculoALista(col);
+            Debug.Log("Esta chocandaaaaaa");
+            sensorChoqueObjeto = true;
         }	
     }
 
-    void anadirColliderObstaculoALista(Collider col){
-    	for(int i = 0; i< collidersObstaculos.Length ; i++){
-    		if(collidersObstaculos[i] == null){
-    			collidersObstaculos[i] = col;
-    			i = collidersObstaculos.Length + 1;
-    		}
+    
+    //Destroy everything that enters the trigger
+	void OnTriggerEnter (Collider col) {
+		if(col.gameObject.tag == "Roca")
+        {
+            piedraRecogida = col.GetComponent<Collider>().attachedRigidbody;
+
+        }	
+    }
+
+    void OnTriggerStay(Collider col){
+    	if(col.gameObject.tag == "BaseEspacial"){
+    		sensorBaseEspacial = true;
     	}
     }
 
