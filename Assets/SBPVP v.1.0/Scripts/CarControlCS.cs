@@ -19,22 +19,28 @@ public class CarControlCS : MonoBehaviour {
 
 	
 	//no se ocupan
+
 	public GUITexture gasPedal;
 	public GUITexture brakePedal;
 	public GUITexture leftPedal;
 	public GUITexture rightPedal;
 	//no se ocupan
 
+	public Rigidbody baseEspacial;
+	public Rigidbody contadorIndividual;
+
 	//mis variables
 	Rigidbody rb;
-	int rotation;
+	float rotation;
 	float velocidad;
 	Collider[] collidersObstaculos;
 	bool sensorChoqueObjeto;
 	Rigidbody piedraRecogida;
 	Vector3 puntoInicial;
 	bool sensorBaseEspacial;
-	Rigidbody baseEspacial;
+	bool sensorPiedraRecogida;
+	int alturaPiedra;
+	bool rodeandoObjeto;
 	// Use this for initialization
 	void Start () {
 		//Alter the center of mass for stability on your car
@@ -45,44 +51,81 @@ public class CarControlCS : MonoBehaviour {
 		brakePedal.gameObject.SetActive(false);
 
 		rb = GetComponent<Rigidbody>();
-		rotation =0 ;
-		velocidad = 5.0f;
+		rotation = transform.localEulerAngles.y;
+		velocidad = 10.0f;
 		sensorChoqueObjeto = false;
 		piedraRecogida = null;
+		sensorPiedraRecogida = false;
 		setPuntoInicial();
+		alturaPiedra = 0;
+		rodeandoObjeto = false;
+
+		rotarAutoAleatoriamente();
 	}
 	
 	// Update is called once per frame
 	void FixedUpdate () {
 
-		if (Input.GetKeyDown(KeyCode.W))
-        {
-        	pararAuto();
-        	rotarAuto(10);
-        }
+		if(sensorChoqueObjeto){//Evitar obstaculos
+			pararAuto();
+			rotarAuto(5);
+			rodeandoObjeto = true;
+			setPuntoInicial();
+			capaAvanzar();
+		}
+		else if(sensorPiedraRecogida && sensorBaseEspacial){//muestras y en nave: Soltarlas
+			soltarPiedraRecogida();
+			//rotarAuto(180);
+		}
+		else if(false){//muestras y no en nave: soltar 2 moronas e ir a nave
 
-        if(Input.GetKeyDown("s")){
-        	
-			Debug.Log("s");
-			
-			avanzarConRotacion(rotation);
-        }
+		}
+		else if(false){//Deteccion muestra: recoger
+			//esta accion se realiza cada frame en ontrigger enter
+		}
+		else if(false){//deteccion moronas: tomar 1 y seguir camino
 
-        if(sensorChoqueObjeto){
-        	pararAuto();
-        	rotarAuto(90);
-        }
-
-        if(piedraRecogida != null){
-        	moverPiedraRecogida();
-        }
-
-        if(sensorBaseEspacial){
-        	Debug.Log("En base prros");
-        }
-
-        desactivarSensores(); //siempre se debe poner al final de la funcion
+		}
+		else if(true){//nada: moverse
+			capaAvanzar();
+		}
+        desactivarSensores(); //siempre se debe poner al final de la funcion  
+        ajustarRotaciónAuto(); 
         
+
+	}
+
+	void capaAvanzar(){
+		if(sensorPiedraRecogida){
+				if(rodeandoObjeto){
+					if(calcularDistanciaRecorrida() > 2.0f){
+						rodeandoObjeto = false;
+					}
+				}
+				else{
+						LookRotationBaseEspacial();		
+				}
+			}
+		moverPiedraRecogida();
+		avanzarConRotacion(rotation);	
+	}
+
+	
+
+	void ajustarRotaciónAuto(){
+		rotation = transform.localEulerAngles.y;
+	}
+
+	void rotarAutoAleatoriamente(){
+		float numeroAleatorio = Random.Range(-30.0f, 30.0f);
+		rotarAuto(numeroAleatorio);
+	}
+
+	void LookRotationBaseEspacial(){
+		Vector3 relativePos = baseEspacial.transform.position - transform.position;
+		Quaternion newRotation = Quaternion.LookRotation(relativePos, Vector3.up);
+		transform.rotation = newRotation;
+		rotation = transform.localEulerAngles.y;
 	}
 
 	void desactivarSensores(){
@@ -126,11 +169,21 @@ public class CarControlCS : MonoBehaviour {
 	}
 
 	void soltarPiedraRecogida(){
+		piedraRecogida.MovePosition(baseEspacial.position+ new Vector3(0,5 + alturaPiedra,0));
+		alturaPiedra += 1;
 		piedraRecogida = null;
+		sensorPiedraRecogida = false;
+		modificarMarcador();
+	}
+
+	void modificarMarcador(){
+		contadorIndividual.GetComponent<contadorVerdes>().anadirContadorIndividual();
 	}
 
 	void moverPiedraRecogida(){
-		piedraRecogida.MovePosition(rb.position + new Vector3(0,10,0));
+		if(sensorPiedraRecogida){
+			piedraRecogida.MovePosition(rb.position + new Vector3(0,10,0));
+		}
 	}
 
 	void OnCollisionStay(Collision col)
@@ -138,16 +191,17 @@ public class CarControlCS : MonoBehaviour {
         if(col.gameObject.tag == "Obstaculo")
         {
             Debug.Log("Esta chocandaaaaaa");
-            sensorChoqueObjeto = true;
+            
         }	
     }
 
     
     //Destroy everything that enters the trigger
 	void OnTriggerEnter (Collider col) {
-		if(col.gameObject.tag == "Roca")
+		if(col.gameObject.tag == "Roca" && sensorPiedraRecogida == false)
         {
             piedraRecogida = col.GetComponent<Collider>().attachedRigidbody;
+            sensorPiedraRecogida = true;
 
         }	
     }
@@ -156,9 +210,16 @@ public class CarControlCS : MonoBehaviour {
     	if(col.gameObject.tag == "BaseEspacial"){
     		sensorBaseEspacial = true;
     	}
+    	else if(col.gameObject.tag == "Obstaculo"){
+    		sensorChoqueObjeto = true;
+    	}
+    	else if(col.gameObject.tag == "Auto"){
+    		sensorChoqueObjeto = true;
+    		rotarAutoAleatoriamente();
+    	}
     }
 
-	void avanzarConRotacion(int deg){
+	void avanzarConRotacion(float deg){
 		float co = Mathf.Sin(degToRad(deg));
 		co = radToDeg(co) * Time.deltaTime;
 
@@ -168,7 +229,7 @@ public class CarControlCS : MonoBehaviour {
 		cambiarVelocidad(velocidad * co,0,velocidad*ca);
 	}
 
-	void rotarAuto(int deg){
+	void rotarAuto(float deg){
 		rotation = rotation + deg;
 		rb.MoveRotation(Quaternion.Euler(0, rotation, 0));
 	}
@@ -190,13 +251,4 @@ public class CarControlCS : MonoBehaviour {
 	}
 
 
-	void OnGUI()
-	{
-		//show the GUI for the speed and gear we are on.
-		GUI.Box(new Rect(10,10,70,30),"MPH: " );
-		if (false)
-			GUI.Box(new Rect(10,70,70,30),"Gear: " );
-		if (true)//if the car is going backwards display the gear as R
-			GUI.Box(new Rect(10,70,70,30),"Gear: R");
-	}
 }
